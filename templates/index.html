@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Select Images</title>
+    <style>
+        .grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+        .image-container {
+            width: 45%;
+            border: 1px solid #ccc;
+            padding: 10px;
+        }
+        img {
+            max-width: 100%;
+            height: auto;
+        }
+        .pagination {
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <h2>Image Gallery (4 per page)</h2>
+    <div id="gallery" class="grid"></div>
+
+    <div class="pagination">
+        <button onclick="prevPage()">Previous</button>
+        <span id="pageNum">Page 1</span>
+        <button onclick="nextPage()">Next</button>
+    </div>
+
+    <button onclick="submitSelection()">Export Selected</button>
+
+    <script>
+        let images = [];
+        let currentPage = 0;
+        const perPage = 4;
+        const selectedSet = new Set();
+
+        fetch('/load_images')
+            .then(res => res.json())
+            .then(data => {
+                images = data.images;
+                renderPage();
+            });
+
+        function renderPage() {
+            const gallery = document.getElementById('gallery');
+            gallery.innerHTML = '';
+            const start = currentPage * perPage;
+            const end = Math.min(start + perPage, images.length);
+
+            for (let i = start; i < end; i++) {
+                const imageName = images[i];
+                const div = document.createElement('div');
+                div.className = 'image-container';
+                div.innerHTML = `
+                    <img src="/static/uploads/${imageName}" alt="${imageName}">
+                    <br>
+                    <input type="checkbox" value="${imageName}" ${selectedSet.has(imageName) ? 'checked' : ''}>
+                    <label>${imageName}</label>
+                `;
+                gallery.appendChild(div);
+            }
+
+            // Attach event listeners after rendering
+            document.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+                cb.addEventListener('change', (e) => {
+                    const name = e.target.value;
+                    if (e.target.checked) {
+                        selectedSet.add(name);
+                    } else {
+                        selectedSet.delete(name);
+                    }
+                });
+            });
+
+            document.getElementById('pageNum').innerText = `Page ${currentPage + 1}`;
+        }
+
+        function prevPage() {
+            if (currentPage > 0) {
+                currentPage--;
+                renderPage();
+            }
+        }
+
+        function nextPage() {
+            if ((currentPage + 1) * perPage < images.length) {
+                currentPage++;
+                renderPage();
+            }
+        }
+
+        function submitSelection() {
+            const selected = Array.from(selectedSet);
+            if (selected.length === 0) {
+                alert("Please select at least one image.");
+                return;
+            }
+
+            fetch('/export', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ selected })
+            })
+            .then(res => res.json())
+            .then(data => alert(data.message));
+        }
+    </script>
+</body>
+</html>
